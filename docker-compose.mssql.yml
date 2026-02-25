@@ -1,0 +1,55 @@
+services:
+
+  # ── 1. SQL Server (default entrypoint — no hacks) ─────────────────────────
+  form-db-mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=P@ssw0rd!Strong
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'P@ssw0rd!Strong' -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ── 2. One-shot init: creates formdb + form_system schema ─────────────────
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+    volumes:
+      - ./docker/mssql/init.sql:/init.sql:ro
+    depends_on:
+      form-db-mssql:
+        condition: service_healthy
+    # Use YAML list format (NOT folded >) so each element is a separate arg
+    entrypoint:
+      - /bin/bash
+      - -c
+      - "/opt/mssql-tools18/bin/sqlcmd -S form-db-mssql,1433 -U sa -P 'P@ssw0rd!Strong' -C -b -i /init.sql && echo 'DB init complete'"
+    restart: "no"
+
+  # ── 3. App starts only after db-init exits 0 ─────────────────────────────
+  demo-app:
+    build:
+      context: .
+      dockerfile: demo-app/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=mssql
+      - SPRING_DATASOURCE_URL=jdbc:sqlserver://form-db-mssql:1433;databaseName=formdb;encrypt=true;trustServerCertificate=true
+      - SPRING_DATASOURCE_USERNAME=sa
+      - SPRING_DATASOURCE_PASSWORD=P@ssw0rd!Strong
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+volumes:
+  mssql_data:
