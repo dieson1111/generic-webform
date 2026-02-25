@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: demo-app
+  datasource:
+    url: jdbc:postgresql://localhost:5432/formdb?currentSchema=form_system
+    username: postgres
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+# Generic Web Form Library configuration
+genericform:
+  schema:
+    source: repository
+    classpath-prefix: forms/

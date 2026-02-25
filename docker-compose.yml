@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  form-db:
+    build: ./docker/db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=formdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  demo-app:
+    build:
+      context: .
+      dockerfile: demo-app/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://form-db:5432/formdb?currentSchema=form_system
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+    depends_on:
+      - form-db
+
+volumes:
+  postgres_data:

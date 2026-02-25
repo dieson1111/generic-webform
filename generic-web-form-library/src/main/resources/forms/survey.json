@@ -1,0 +1,75 @@
+{
+  "formId": "survey",
+  "version": "v1",
+  "fields": [
+    {
+      "name": "fullName",
+      "type": "TEXT",
+      "required": true
+    },
+    {
+      "name": "email",
+      "type": "EMAIL",
+      "required": true
+    },
+    {
+      "name": "age",
+      "type": "NUMBER",
+      "required": false,
+      "min": 1,
+      "max": 150
+    },
+    {
+      "name": "addresses",
+      "type": "GROUP",
+      "required": true,
+      "nestedFields": [
+        {
+          "name": "street",
+          "type": "TEXT",
+          "required": true
+        },
+        {
+          "name": "city",
+          "type": "TEXT",
+          "required": true
+        },
+        {
+          "name": "postalCode",
+          "type": "TEXT",
+          "required": true,
+          "regex": "^[A-Za-z0-9\\- ]{3,10}$"
+        },
+        {
+          "name": "country",
+          "type": "TEXT",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "workHistory",
+      "type": "GROUP",
+      "required": false,
+      "nestedFields": [
+        {
+          "name": "company",
+          "type": "TEXT",
+          "required": true
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "required": true
+        },
+        {
+          "name": "yearsWorked",
+          "type": "NUMBER",
+          "required": false,
+          "min": 0,
+          "max": 50
+        }
+      ]
+    }
+  ]
+}
