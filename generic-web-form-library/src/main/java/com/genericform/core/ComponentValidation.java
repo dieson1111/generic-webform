@@ -1,34 +1,28 @@
 package com.genericform.core;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
  * Maps the nested {@code validate} object from a Form.io component.
  * <p>
- * Example JSON:
- * 
- * <pre>
- * "validate": {
- *   "required": true,
- *   "pattern": "^[0-9]{5}$",
- *   "minLength": 1,
- *   "maxLength": 100,
- *   "customMessage": "Please enter a valid postal code",
- *   "custom": "",
- *   "onlyAvailableItems": false
- * }
- * </pre>
+ * Fields actively used by the validation engine are declared as typed
+ * Java fields. All other validation properties (e.g. {@code customPrivate},
+ * {@code strictDateValidation}, {@code json}) are captured in
+ * {@link #additionalProperties} for lossless round-trip serialization.
  * </p>
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class ComponentValidation {
 
     /** Whether this field is mandatory. */
@@ -53,4 +47,22 @@ public class ComponentValidation {
 
     /** For select: only allow values from the predefined list. */
     private boolean onlyAvailableItems;
+
+    // ─────────────────────────── Catch-All ────────────────────────────────
+
+    @Builder.Default
+    private Map<String, Object> additionalProperties = new LinkedHashMap<>();
+
+    @JsonAnySetter
+    public void setAdditionalProperty(String name, Object value) {
+        if (additionalProperties == null) {
+            additionalProperties = new LinkedHashMap<>();
+        }
+        additionalProperties.put(name, value);
+    }
+
+    @JsonAnyGetter
+    public Map<String, Object> getAdditionalProperties() {
+        return additionalProperties;
+    }
 }

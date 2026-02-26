@@ -1,12 +1,15 @@
 package com.genericform.core;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents a single component node in a Form.io component tree.
@@ -24,12 +27,18 @@ import java.util.List;
  * Input components have {@code input = true} and carry a {@code key} that
  * maps to the flat submission data.
  * </p>
+ * <p>
+ * Fields actively used by the backend validation engine are declared as
+ * typed Java fields. All other Form.io properties (UI hints, conditional
+ * logic, overlays, etc.) are captured in {@link #additionalProperties}
+ * via {@link JsonAnySetter} and re-emitted on serialization via
+ * {@link JsonAnyGetter}, ensuring lossless round-trip fidelity.
+ * </p>
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class FormComponent {
 
     // ─────────────────────────── Identity ──────────────────────────────────
@@ -109,4 +118,33 @@ public class FormComponent {
      * {@code "url"}).
      */
     private String dataSrc;
+
+    // ─────────────────────────── Catch-All (extra Form.io properties) ─────
+
+    /**
+     * Stores all Form.io component properties that are not explicitly
+     * declared as typed Java fields above (e.g. {@code tooltip},
+     * {@code customClass}, {@code conditional}, {@code overlay},
+     * {@code datePicker}, {@code widget}, etc.).
+     * <p>
+     * This ensures lossless round-trip serialization: every property
+     * present in the original JSON is preserved when the schema is
+     * stored and later returned to the frontend.
+     * </p>
+     */
+    @Builder.Default
+    private Map<String, Object> additionalProperties = new LinkedHashMap<>();
+
+    @JsonAnySetter
+    public void setAdditionalProperty(String name, Object value) {
+        if (additionalProperties == null) {
+            additionalProperties = new LinkedHashMap<>();
+        }
+        additionalProperties.put(name, value);
+    }
+
+    @JsonAnyGetter
+    public Map<String, Object> getAdditionalProperties() {
+        return additionalProperties;
+    }
 }
