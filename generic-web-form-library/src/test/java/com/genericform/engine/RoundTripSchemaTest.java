@@ -109,10 +109,9 @@ class RoundTripSchemaTest {
                                 "tableView should be in additionalProperties");
                 assertTrue(extras.containsKey("labelPosition"),
                                 "labelPosition should be in additionalProperties");
-                assertTrue(extras.containsKey("html"),
-                                "html should be in additionalProperties");
 
                 // Spot-check Behavior/Logic fields
+
                 assertTrue(extras.containsKey("conditional"),
                                 "conditional should be in additionalProperties");
                 assertTrue(extras.containsKey("logic"),
@@ -158,6 +157,21 @@ class RoundTripSchemaTest {
                                 "inputType should be in additionalProperties");
                 assertTrue(extras.containsKey("id"),
                                 "id should be in additionalProperties");
+        }
+
+        @Test
+        @DisplayName("Content component preserves extra properties (html)")
+        void contentComponentExtraProperties() throws Exception {
+                FormSchema schema = loadSampleSchema();
+
+                // Find a content-type component
+                FormComponent content = findByKey(schema.getComponents(), "content");
+                assertNotNull(content, "Should find 'content' component");
+                assertEquals("content", content.getType());
+
+                Map<String, Object> extras = content.getAdditionalProperties();
+                assertTrue(extras.containsKey("html"),
+                                "html should be in additionalProperties for content component");
         }
 
         @Test
