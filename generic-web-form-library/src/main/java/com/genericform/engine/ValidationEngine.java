@@ -3,6 +3,7 @@ package com.genericform.engine;
 import com.genericform.core.*;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.internal.constraintvalidators.bv.EmailValidator;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -36,6 +37,31 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 public class ValidationEngine {
+
+    /**
+     * Optional JavaScript engine for evaluating Form.io {@code validate.custom}
+     * scripts. If {@code null}, custom JS validation is silently skipped.
+     */
+    @Nullable
+    private final JavaScriptValidationEngine jsEngine;
+
+    /**
+     * Create a ValidationEngine without custom JS validation support.
+     */
+    public ValidationEngine() {
+        this(null);
+    }
+
+    /**
+     * Create a ValidationEngine with optional custom JS validation.
+     *
+     * @param jsEngine the JavaScript engine (may be {@code null} to disable)
+     */
+    public ValidationEngine(@Nullable JavaScriptValidationEngine jsEngine) {
+        this.jsEngine = jsEngine;
+        log.info("ValidationEngine initialized (customJs={})",
+                jsEngine != null ? "enabled" : "disabled");
+    }
 
     // ── Layout types: traverse children, never validate ──────────────────
     private static final Set<String> LAYOUT_TYPES = Set.of(
@@ -100,8 +126,14 @@ public class ValidationEngine {
                 validateInputComponent(component, data, errors);
             }
 
+            // ── EditGrid: validate each row's children against row data ──
+            if ("editgrid".equals(type) || "datagrid".equals(type)) {
+                validateGridComponent(component, data, errors);
+            }
+
             // ── If it has children (non-standard layout), traverse ──
-            if (component.getComponents() != null && !component.getComponents().isEmpty()) {
+            if (component.getComponents() != null && !component.getComponents().isEmpty()
+                    && !"editgrid".equals(type) && !"datagrid".equals(type)) {
                 traverseComponents(component.getComponents(), data, errors);
             }
         }
@@ -169,6 +201,13 @@ public class ValidationEngine {
                 validateSignature(value, key, errors);
             default ->
                 validateText(component, value, key, errors);
+        }
+
+        // ── Custom JavaScript validation (cross-field) ────────────────
+        // Runs after built-in checks. Only executes if no error was
+        // already recorded for this key by the checks above.
+        if (!errors.containsKey(key)) {
+            validateCustomJavaScript(component, value, data, key, errors);
         }
     }
 
@@ -287,6 +326,104 @@ public class ValidationEngine {
             Map<String, String> errors) {
         if (isBlank(value)) {
             errors.put(key, "Signature is required");
+        }
+    }
+
+    // ───────────────────────────── Helpers ────────────────────────────────
+
+    // ───────────────────── Custom JavaScript Validation ───────────────────
+
+    /**
+     * Evaluate a Form.io {@code validate.custom} JavaScript expression.
+     * <p>
+     * The script receives these bindings:
+     * <ul>
+     * <li>{@code input} – current field value</li>
+     * <li>{@code data} – full flat submission data (enables cross-field
+     * checks)</li>
+     * <li>{@code row} – same as data for flat forms</li>
+     * <li>{@code component} – component metadata (key, type, label)</li>
+     * </ul>
+     * The script must set {@code valid} to {@code true} (pass) or an error string
+     * (fail).
+     */
+    private void validateCustomJavaScript(FormComponent component, Object value,
+            Map<String, Object> data, String key,
+            Map<String, String> errors) {
+        ComponentValidation v = component.getValidate();
+        if (v == null || v.getCustom() == null || v.getCustom().isBlank()) {
+            return;
+        }
+        if (jsEngine == null) {
+            log.debug("Custom JS validation skipped for '{}': JS engine not available", key);
+            return;
+        }
+
+        String errorMsg = jsEngine.evaluate(v.getCustom(), value, data, component);
+        if (errorMsg != null) {
+            // Use customMessage if provided, otherwise use the JS-returned message
+            String msg = hasCustomMessage(v) ? v.getCustomMessage() : errorMsg;
+            errors.put(key, msg);
+        }
+    }
+
+    // ───────────────────── EditGrid / DataGrid Validation ─────────────────
+
+    /**
+     * Validate editgrid / datagrid components by iterating submitted rows
+     * and validating each row's child components against that row's data.
+     */
+    @SuppressWarnings("unchecked")
+    private void validateGridComponent(FormComponent gridComponent,
+            Map<String, Object> data,
+            Map<String, String> errors) {
+        String gridKey = gridComponent.getKey();
+        if (gridKey == null || data == null)
+            return;
+
+        Object gridData = data.get(gridKey);
+        if (!(gridData instanceof List<?> rows))
+            return;
+
+        List<FormComponent> rowComponents = gridComponent.getComponents();
+        if (rowComponents == null || rowComponents.isEmpty())
+            return;
+
+        for (int i = 0; i < rows.size(); i++) {
+            Object rowObj = rows.get(i);
+            if (!(rowObj instanceof Map<?, ?> rowMap))
+                continue;
+
+            Map<String, Object> rowData = (Map<String, Object>) rowMap;
+            for (FormComponent child : rowComponents) {
+                if (!child.isInput())
+                    continue;
+                String childKey = child.getKey();
+                if (childKey == null)
+                    continue;
+
+                // Create a scoped error key: gridKey[index].childKey
+                String errorKey = gridKey + "[" + i + "]." + childKey;
+                Object value = rowData.get(childKey);
+                ComponentValidation cv = child.getValidate();
+
+                // Required check within the row
+                if (cv != null && cv.isRequired() && isBlank(value)) {
+                    String msg = hasCustomMessage(cv) ? cv.getCustomMessage() : "Field is required";
+                    errors.put(errorKey, msg);
+                    continue;
+                }
+
+                // Custom JS validation within the row (row-scoped data)
+                if (cv != null && cv.getCustom() != null && !cv.getCustom().isBlank()
+                        && jsEngine != null && !isBlank(value)) {
+                    String jsError = jsEngine.evaluate(cv.getCustom(), value, data, child);
+                    if (jsError != null) {
+                        String msg = hasCustomMessage(cv) ? cv.getCustomMessage() : jsError;
+                        errors.put(errorKey, msg);
+                    }
+                }
+            }
         }
     }
 

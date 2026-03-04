@@ -51,6 +51,22 @@ public class GenericFormProperties {
      */
     private String filesystemPath;
 
+    // ─────────────────────────── Validation Settings ─────────────────────
+
+    /**
+     * Whether server-side custom JavaScript validation is enabled.
+     * When enabled, {@code validate.custom} scripts in Form.io schemas
+     * are evaluated via GraalVM JS. Default: {@code true}.
+     */
+    private boolean customJsEnabled = true;
+
+    /**
+     * Maximum execution time in seconds for a single custom JS validation
+     * script. Protects against infinite loops or expensive scripts.
+     * Default: {@code 5}.
+     */
+    private int customJsTimeoutSeconds = 5;
+
     /**
      * Enum defining the supported schema source types.
      */

@@ -41,7 +41,19 @@ public class ComponentValidation {
     private String customMessage;
 
     /**
-     * Custom JavaScript validation expression (stored, not executed server-side).
+     * Custom JavaScript validation expression evaluated server-side via GraalVM.
+     * <p>
+     * The script must set a variable {@code valid} to either {@code true}
+     * (passed) or an error-message string (failed). Available bindings:
+     * <ul>
+     * <li>{@code input} — the value of the current field</li>
+     * <li>{@code data} — the full flat submission data (enables cross-field
+     * checks)</li>
+     * <li>{@code row} — same as data for flat forms; scoped to the row for
+     * edit-grids</li>
+     * <li>{@code component} — component metadata (key, type, label)</li>
+     * </ul>
+     * </p>
      */
     private String custom;
 

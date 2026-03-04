@@ -9,11 +9,14 @@ import com.genericform.core.SchemaRepository;
 import com.genericform.engine.DefaultFormEngine;
 import com.genericform.engine.DefaultFormSchemaManager;
 import com.genericform.engine.FormRegistry;
+import com.genericform.engine.JavaScriptValidationEngine;
 import com.genericform.engine.ValidationEngine;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.lang.Nullable;
 
 /**
  * Spring Boot auto-configuration for the Generic Web Form Engine.
@@ -83,10 +86,29 @@ public class GenericFormAutoConfiguration {
         return new FormRegistry(schemaProvider);
     }
 
+    // ───────────────────────── JavaScript Validation Engine ───────────────────
+
+    /**
+     * GraalVM-based JavaScript engine for evaluating Form.io
+     * {@code validate.custom} scripts server-side.
+     * <p>
+     * Only created when {@code genericform.schema.custom-js-enabled=true}
+     * (default).
+     * </p>
+     */
+    @Bean
+    @ConditionalOnMissingBean(JavaScriptValidationEngine.class)
+    @ConditionalOnProperty(name = "genericform.schema.custom-js-enabled", havingValue = "true", matchIfMissing = true)
+    public JavaScriptValidationEngine javaScriptValidationEngine(
+            GenericFormProperties properties) {
+        return new JavaScriptValidationEngine(properties.getCustomJsTimeoutSeconds());
+    }
+
     @Bean
     @ConditionalOnMissingBean(ValidationEngine.class)
-    public ValidationEngine validationEngine() {
-        return new ValidationEngine();
+    public ValidationEngine validationEngine(
+            @Nullable JavaScriptValidationEngine jsEngine) {
+        return new ValidationEngine(jsEngine);
     }
 
     @Bean

@@ -18,3 +18,5 @@ genericform:
   schema:
     source: repository
     classpath-prefix: forms/
+    custom-js-enabled: true
+    custom-js-timeout-seconds: 5
